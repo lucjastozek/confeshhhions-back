@@ -4,6 +4,7 @@ import express from "express";
 import { Client } from "pg";
 import { getEnvVarOrFail } from "./support/envVarUtils";
 import { setupDBClientConfig } from "./support/setupDBClientConfig";
+import * as bcrypt from "bcrypt";
 
 dotenv.config(); //Read .env file lines as though they were env vars.
 
@@ -29,6 +30,52 @@ app.get("/health-check", async (_req, res) => {
         //Recover from error rather than letting system halt
         console.error(error);
         res.status(500).send("An error occurred. Check server logs.");
+    }
+});
+
+app.post("/register", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = await client.query(
+            "INSERT INTO users (username, password) VALUES ($1, $2) RETURNING *",
+            [username, hashedPassword]
+        );
+        res.status(200).json(user.rows[0]);
+        res.status(200).send("system ok");
+    } catch (error) {
+        //Recover from error rather than letting system halt
+        console.error(error);
+        res.status(500).send("An error occurred. Check server logs.");
+    }
+});
+
+app.post("/login", async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        const user = await client.query(
+            "SELECT * FROM users WHERE username = $1",
+            [username]
+        );
+
+        if (user.rows.length === 0) {
+            return res.status(401).json({ message: "Invalid username" });
+        }
+
+        const validPassword = await bcrypt.compare(
+            password,
+            user.rows[0].password
+        );
+
+        if (validPassword) {
+            res.status(200).json(user.rows[0]);
+        } else {
+            res.status(401).json({ message: "Authentication failed" });
+        }
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ message: "An error occurred" });
     }
 });
 
