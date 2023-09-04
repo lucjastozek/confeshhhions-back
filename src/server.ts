@@ -34,8 +34,8 @@ app.get("/health-check", async (_req, res) => {
 });
 
 app.post("/register", async (req, res) => {
+    const { username, password } = req.body;
     try {
-        const { username, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await client.query(
@@ -52,8 +52,8 @@ app.post("/register", async (req, res) => {
 });
 
 app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
     try {
-        const { username, password } = req.body;
         const user = await client.query(
             "SELECT * FROM users WHERE username = $1",
             [username]
@@ -73,6 +73,47 @@ app.post("/login", async (req, res) => {
         } else {
             res.status(401).json({ message: "Authentication failed" });
         }
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ message: "An error occurred" });
+    }
+});
+
+app.post("/confessions", async (req, res) => {
+    const { text } = req.body;
+    try {
+        const confession = await client.query(
+            "INSERT INTO confessions (text) VALUES ($1) RETURNING *",
+            [text]
+        );
+
+        res.status(200).json(confession.rows[0]);
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ message: "An error occurred" });
+    }
+});
+
+app.get("/confessions", async (_req, res) => {
+    try {
+        const confessions = await client.query("SELECT * FROM confessions");
+
+        res.status(200).json(confessions.rows);
+    } catch (error) {
+        console.error(`Error: ${error}`);
+        res.status(500).json({ message: "An error occurred" });
+    }
+});
+
+app.get("/confessions/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    try {
+        const confession = await client.query(
+            "SELECT * FROM confessions WHERE id = $1",
+            [id]
+        );
+
+        res.status(200).json(confession.rows[0]);
     } catch (error) {
         console.error(`Error: ${error}`);
         res.status(500).json({ message: "An error occurred" });
